@@ -1,0 +1,90 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:15-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-test_planning}
+    ports:
+      - "5432:5432"
+
+  # Redis for rate limiting and caching
+  redis:
+    image: redis:alpine
+    volumes:
+      - redis_data:/data
+
+  # Backend API
+  backend:
+    build: ./backend
+    volumes:
+      - ./backend:/app
+    command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_SERVER=postgres
+      - REDIS_HOST=redis
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+
+  # Frontend
+  frontend:
+    build: ./frontend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./docker/prometheus:/etc/prometheus
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+
+  # Grafana for metrics visualization
+  grafana:
+    image: grafana/grafana:latest
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning
+      - grafana_data:/var/lib/grafana
+    env_file:
+      - .env
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data: 
