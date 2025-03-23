@@ -1,29 +1,50 @@
 import asyncio
+import os
 import sys
 from logging.config import fileConfig
 from pathlib import Path
 
-from sqlalchemy import engine_from_config, pool
-from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import async_engine_from_config
+# Add the parent directory to sys.path to allow absolute imports
+sys.path.append(str(Path(__file__).resolve().parents[1].parent))
+
+# Import SQLAlchemy components
+try:
+    from sqlalchemy import engine_from_config, pool
+    from sqlalchemy.engine import Connection
+    from sqlalchemy.ext.asyncio import async_engine_from_config
+except ImportError as e:
+    print(f"Error importing SQLAlchemy modules: {e}")
+    print(f"Current sys.path: {sys.path}")
+    raise
 
 from alembic import context
 
-# Add the parent directory to sys.path to allow absolute imports
-sys.path.append(str(Path(__file__).resolve().parents[2]))
-
 # Import our models and config
-from app.core.config import settings  
-from app.models.base import Base
-from app.models.user import User
-from app.models.doe_asset import DoEAsset, DoEAssetVersion, ShareableLink
+try:
+    from app.core.config import settings  
+    from app.models.base import Base
+    from app.models.user import User
+    from app.models.doe_asset import DoEAsset, DoEAssetVersion, ShareableLink
+except ImportError as e:
+    print(f"Error importing application modules: {e}")
+    print(f"Current sys.path: {sys.path}")
+    raise
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
 # Override the SQLAlchemy URL with our config
-config.set_main_option("sqlalchemy.url", str(settings.DATABASE_URI))
+try:
+    config.set_main_option("sqlalchemy.url", str(settings.DATABASE_URI))
+except Exception as e:
+    print(f"Error setting database URI: {e}")
+    # Fallback to environment variable if settings object fails
+    db_url = os.getenv("DATABASE_URI")
+    if db_url:
+        config.set_main_option("sqlalchemy.url", db_url)
+    else:
+        print("Warning: No database URI set, migrations may fail")
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
