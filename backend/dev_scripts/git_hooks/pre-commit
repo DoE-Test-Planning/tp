@@ -1,0 +1,77 @@
+#!/bin/bash
+
+# Pre-commit hook to check for import issues
+
+# Change to the root directory of the repository
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+# Check if we're in a virtual environment, if not try to activate it
+if [ -z "$VIRTUAL_ENV" ]; then
+    if [ -d ".venv" ]; then
+        echo "Activating virtual environment..."
+        # Try to source the virtual environment
+        if [ -f ".venv/bin/activate" ]; then
+            # shellcheck disable=SC1091
+            source .venv/bin/activate
+        elif [ -f ".venv/Scripts/activate" ]; then
+            # shellcheck disable=SC1091
+            source .venv/Scripts/activate
+        else
+            echo "Warning: Virtual environment found but activate script not located."
+            echo "Running without virtual environment..."
+        fi
+    else
+        echo "Warning: No virtual environment found. Dependencies may be missing."
+    fi
+fi
+
+# Run the import scanner
+echo "Checking for import issues..."
+if [ -f "backend/scan_imports.py" ]; then
+    python backend/scan_imports.py
+    SCANNER_EXIT=$?
+    if [ $SCANNER_EXIT -ne 0 ]; then
+        echo "Error: Import issues detected. Please fix before committing."
+        exit 1
+    fi
+else
+    echo "Warning: Import scanner not found. Skipping import checks."
+fi
+
+# Check if Python files are being committed
+python_files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.py$')
+if [ -n "$python_files" ]; then
+    # Check Python syntax
+    echo "Checking Python syntax..."
+    for file in $python_files; do
+        if [ -f "$file" ]; then
+            python -m py_compile "$file"
+            if [ $? -ne 0 ]; then
+                echo "Error: Syntax error in $file. Please fix before committing."
+                exit 1
+            fi
+        fi
+    done
+    
+    # Run linting if available
+    if command -v black &> /dev/null; then
+        echo "Running black formatter check..."
+        black --check $python_files
+        if [ $? -ne 0 ]; then
+            echo "Error: Black formatter check failed. Run 'black' to fix formatting."
+            exit 1
+        fi
+    fi
+    
+    if command -v isort &> /dev/null; then
+        echo "Running isort import sorter check..."
+        isort --check $python_files
+        if [ $? -ne 0 ]; then
+            echo "Error: isort check failed. Run 'isort' to fix import ordering."
+            exit 1
+        fi
+    fi
+fi
+
+echo "Pre-commit checks passed!"
+exit 0 

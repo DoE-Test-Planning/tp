@@ -37,12 +37,40 @@ This project is a monorepo containing:
 2. Run `docker-compose up -d` to start all services
 3. Access the application at http://localhost:3000
 
+### Development Setup (without Docker)
+
+For local development without Docker, you can use the provided setup scripts:
+
+#### Backend Setup
+
+```bash
+# Set up Python virtual environment and install dependencies
+./backend/setup_dev_env.sh
+
+# Install Git hooks for pre-commit checks
+./backend/dev_scripts/install_git_hooks.sh
+
+# Run the backend server
+cd backend
+source ../.venv/bin/activate
+uvicorn app.main:app --reload
+```
+
+#### Checking for Import Issues
+
+```bash
+# Scan the codebase for import issues
+cd backend
+./scan_imports.py
+```
+
 ## Branching Strategy
 
 - `main`: Production-ready code
 - `develop`: Integration branch for features
 - Feature branches: `feature/<feature-name>`
 - Bugfix branches: `bugfix/<bug-description>`
+- Fix branches: `fix/<issue-description>`
 
 ## License
 
